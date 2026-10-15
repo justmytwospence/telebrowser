@@ -1,0 +1,7 @@
+#!/bin/bash
+# labwc autostart (replaces linuxserver's default, which opens one shared Chromium).
+# Project browsers are started on demand by the supervisor; keep it alive.
+while true; do
+  /bin/bash /agent-browser/supervisor.sh
+  sleep 2
+done &
