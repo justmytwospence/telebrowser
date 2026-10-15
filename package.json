@@ -1,0 +1,18 @@
+{
+  "name": "agent-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Per-project headful Chromium for coding agents: CDP gateway, MCP launcher, human view.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "bin": {
+    "agent-browser": "bin/agent-browser"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "start": "node gateway/index.js"
+  }
+}
