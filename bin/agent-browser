@@ -1,0 +1,80 @@
+#!/usr/bin/env node
+// agent-browser: this project's browser on the shared agent desktop.
+
+import { loadConfig, api } from "../cli/config.js";
+import { runMcpProxy } from "../cli/mcp-proxy.js";
+import { listDownloads } from "../cli/tools.js";
+
+const USAGE = `usage: agent-browser <command> [--project <name>]
+
+  mcp            stdio MCP server: chrome-devtools-mcp for this project's browser,
+                 plus browser_handoff, browser_downloads, browser_info
+  status         this project's browser (paths, view URL, running or not)
+  start          start this project's browser and wait until it answers
+  stop           stop it (the profile is kept; scratch is wiped)
+  focus          bring its window to the front of the human view
+  hold [min]     keep it alive without agent activity (default 60)
+  downloads      list downloaded files, newest first
+  ws             print the CDP WebSocket URL for scripts (contains the token)
+  http           print the CDP HTTP base for scripts, e.g. <http>/json/version
+  project        print the project name for this directory
+
+The project is the main checkout's directory name (worktrees share it); outside a git
+repository it is "scratch". Environment: AGENT_BROWSER_URL (default http://127.0.0.1:5858),
+AGENT_BROWSER_PROJECT, AGENT_BROWSER_SECRET or ~/.config/agent-browser/secret.`;
+
+const argv = process.argv.slice(2);
+const pi = argv.indexOf("--project");
+if (pi !== -1) {
+  process.env.AGENT_BROWSER_PROJECT = argv[pi + 1];
+  argv.splice(pi, 2);
+}
+const [cmd, ...rest] = argv;
+const print = (x) => console.log(typeof x === "string" ? x : JSON.stringify(x, null, 2));
+
+try {
+  if (!cmd || cmd === "help" || cmd === "--help" || cmd === "-h") {
+    print(USAGE);
+    process.exit(cmd ? 0 : 2);
+  }
+  const cfg = loadConfig();
+  switch (cmd) {
+    case "mcp":
+      process.exit(await runMcpProxy(cfg));
+    case "status":
+      print(await api(cfg, "status", { method: "GET" }));
+      break;
+    case "start":
+      print(await api(cfg, "ensure"));
+      break;
+    case "stop":
+      print(await api(cfg, "stop"));
+      break;
+    case "focus":
+      print(await api(cfg, "focus"));
+      break;
+    case "hold":
+      print(await api(cfg, "hold", { body: { minutes: Number(rest[0]) || 60 } }));
+      break;
+    case "downloads": {
+      const st = await api(cfg, "status", { method: "GET" });
+      print({ downloadsDir: st.downloadsDir, files: listDownloads(st.downloadsDir) });
+      break;
+    }
+    case "ws":
+      print(cfg.wsEndpoint);
+      break;
+    case "http":
+      print(cfg.httpEndpoint);
+      break;
+    case "project":
+      print(cfg.project);
+      break;
+    default:
+      console.error(USAGE);
+      process.exit(2);
+  }
+} catch (err) {
+  console.error(`agent-browser: ${err.message}`);
+  process.exit(1);
+}
