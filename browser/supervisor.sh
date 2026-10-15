@@ -11,10 +11,10 @@
 # previous project's Chromium still holds.
 
 set -u
-DATA=${AGENT_BROWSER_DATA:-/data}
+DATA=${TELEBROWSER_DATA:-/data}
 WANT="$DATA/run/want"
 UP="$DATA/run/up"
-STATE=/tmp/agent-browser
+STATE=/tmp/telebrowser
 LOG="$DATA/run/supervisor.log"
 mkdir -p "$WANT" "$UP" "$STATE"
 # Nothing survives a container restart, so whatever up/ says is stale.
@@ -54,7 +54,7 @@ start() {
   seed_profile "$dir"
   local ozone=()
   [[ "${PIXELFLUX_WAYLAND:-}" == "true" ]] && ozone=(--ozone-platform=wayland)
-  # shellcheck disable=SC2086 # AGENT_BROWSER_CHROMIUM_FLAGS is a flag list on purpose
+  # shellcheck disable=SC2086 # TELEBROWSER_CHROMIUM_FLAGS is a flag list on purpose
   setsid /usr/bin/chromium \
     --no-sandbox \
     --test-type \
@@ -63,13 +63,13 @@ start() {
     --user-data-dir="$dir/profile" \
     --remote-debugging-port="$port" \
     --window-name="[$p]" \
-    --class="agent-browser-$p" \
+    --class="telebrowser-$p" \
     --no-first-run \
     --no-default-browser-check \
     --hide-crash-restore-bubble \
     --start-maximized \
     "${ozone[@]}" \
-    ${AGENT_BROWSER_CHROMIUM_FLAGS:-} \
+    ${TELEBROWSER_CHROMIUM_FLAGS:-} \
     about:blank >>"$STATE/$p.log" 2>&1 </dev/null &
   echo $! >"$STATE/$p.pid"
   echo "$port $!" >"$UP/.$p.tmp" && mv "$UP/.$p.tmp" "$UP/$p"

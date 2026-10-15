@@ -1,4 +1,4 @@
-// A stdio MCP server that is chrome-devtools-mcp plus agent-browser's own tools.
+// A stdio MCP server that is chrome-devtools-mcp plus telebrowser's own tools.
 //
 // It spawns chrome-devtools-mcp against this project's CDP endpoint and relays
 // newline-delimited JSON-RPC both ways, with two interventions: our tools are appended
@@ -12,8 +12,8 @@ import { TOOLS, TOOL_NAMES, callTool } from "./tools.js";
 export const CHROME_DEVTOOLS_MCP = "chrome-devtools-mcp@1.10.1";
 
 export function childCommand(cfg, env = process.env) {
-  if (env.AGENT_BROWSER_MCP_CMD) {
-    const [cmd, ...args] = JSON.parse(env.AGENT_BROWSER_MCP_CMD);
+  if (env.TELEBROWSER_MCP_CMD) {
+    const [cmd, ...args] = JSON.parse(env.TELEBROWSER_MCP_CMD);
     return { cmd, args };
   }
   return {
@@ -75,7 +75,7 @@ export function runMcpProxy(cfg, { stdin = process.stdin, stdout = process.stdou
   return new Promise((resolve) => {
     child.on("exit", (code, signal) => resolve(code ?? (signal ? 1 : 0)));
     child.on("error", (err) => {
-      process.stderr.write(`agent-browser: cannot start ${cmd}: ${err.message}\n`);
+      process.stderr.write(`telebrowser: cannot start ${cmd}: ${err.message}\n`);
       resolve(1);
     });
   });

@@ -24,8 +24,8 @@ test("project resolution: repo, worktree, subdir, non-repo, override", () => {
   assert.equal(resolveProject(join(repo, "sub"), {}), "my-repo");
   assert.equal(resolveProject(join(repo, ".worktrees", "feat-x"), {}), "my-repo");
   assert.equal(resolveProject(root, {}), "scratch");
-  assert.equal(resolveProject(root, { AGENT_BROWSER_PROJECT: "other" }), "other");
-  assert.throws(() => resolveProject(root, { AGENT_BROWSER_PROJECT: "../x" }));
+  assert.equal(resolveProject(root, { TELEBROWSER_PROJECT: "other" }), "other");
+  assert.throws(() => resolveProject(root, { TELEBROWSER_PROJECT: "../x" }));
 });
 
 test("downloads are listed newest first with in-progress flag", () => {
@@ -47,7 +47,7 @@ test("mcp proxy appends our tools and relays everything else", async () => {
   const done = runMcpProxy({ wsEndpoint: "ws://x", baseUrl: "http://127.0.0.1:1", token: "t" }, {
     stdin,
     stdout,
-    env: { ...process.env, AGENT_BROWSER_MCP_CMD: JSON.stringify([process.execPath, fake]) },
+    env: { ...process.env, TELEBROWSER_MCP_CMD: JSON.stringify([process.execPath, fake]) },
   });
   const lines = [];
   const got = (n) =>

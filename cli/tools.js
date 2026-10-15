@@ -1,4 +1,4 @@
-// The tools agent-browser adds next to chrome-devtools-mcp's.
+// The tools telebrowser adds next to chrome-devtools-mcp's.
 
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -65,7 +65,7 @@ export async function callTool(cfg, name, args = {}) {
       await api(cfg, "ensure");
       await api(cfg, "hold", { body: { minutes } });
       const st = await api(cfg, "focus");
-      const where = st.viewUrl ? `Open ${st.viewUrl}` : "Open the agent browser view";
+      const where = st.viewUrl ? `Open ${st.viewUrl}` : "Open the telebrowser view";
       return text(
         `Tell the user exactly this, then wait for their reply:\n\n` +
           `"${where} and use the Chromium window titled ${st.windowTitle} (the project ${st.project}). ` +
@@ -89,7 +89,7 @@ export async function callTool(cfg, name, args = {}) {
             cdp: {
               webSocket: cfg.wsEndpoint,
               http: cfg.httpEndpoint,
-              note: "Both carry this project's token; keep them out of committed files and logs. `agent-browser ws` prints the WebSocket URL in a shell.",
+              note: "Both carry this project's token; keep them out of committed files and logs. `telebrowser ws` prints the WebSocket URL in a shell.",
             },
           },
           null,
@@ -99,6 +99,6 @@ export async function callTool(cfg, name, args = {}) {
     }
     return { isError: true, ...text(`unknown tool ${name}`) };
   } catch (err) {
-    return { isError: true, ...text(`agent-browser: ${err.message}`) };
+    return { isError: true, ...text(`telebrowser: ${err.message}`) };
   }
 }

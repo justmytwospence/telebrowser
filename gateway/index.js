@@ -4,9 +4,9 @@ import { Projects } from "./projects.js";
 import { createGateway, probe } from "./server.js";
 
 const env = process.env;
-const secret = env.AGENT_BROWSER_SECRET || "";
+const secret = env.TELEBROWSER_SECRET || "";
 if (secret.length < 32) {
-  console.error("AGENT_BROWSER_SECRET must be set (at least 32 characters)");
+  console.error("TELEBROWSER_SECRET must be set (at least 32 characters)");
   process.exit(1);
 }
 
@@ -31,7 +31,7 @@ setInterval(() => {
   for (const p of projects.sweep()) console.log(`idle stop ${p}`);
 }, 60_000).unref();
 
-server.listen(port, env.LISTEN_HOST || "0.0.0.0", () => console.log(`agent-browser gateway listening on :${port}`));
+server.listen(port, env.LISTEN_HOST || "0.0.0.0", () => console.log(`telebrowser gateway listening on :${port}`));
 
 for (const sig of ["SIGTERM", "SIGINT"]) {
   process.on(sig, () => {

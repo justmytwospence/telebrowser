@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// agent-browser: this project's browser on the shared agent desktop.
+// telebrowser: this project's browser on the shared agent desktop.
 
 import { loadConfig, api } from "../cli/config.js";
 import { runMcpProxy } from "../cli/mcp-proxy.js";
 import { listDownloads } from "../cli/tools.js";
 
-const USAGE = `usage: agent-browser <command> [--project <name>]
+const USAGE = `usage: telebrowser <command> [--project <name>]
 
   mcp            stdio MCP server: chrome-devtools-mcp for this project's browser,
                  plus browser_handoff, browser_downloads, browser_info
@@ -20,13 +20,13 @@ const USAGE = `usage: agent-browser <command> [--project <name>]
   project        print the project name for this directory
 
 The project is the main checkout's directory name (worktrees share it); outside a git
-repository it is "scratch". Environment: AGENT_BROWSER_URL (default http://127.0.0.1:5858),
-AGENT_BROWSER_PROJECT, AGENT_BROWSER_SECRET or ~/.config/agent-browser/secret.`;
+repository it is "scratch". Environment: TELEBROWSER_URL (default http://127.0.0.1:5858),
+TELEBROWSER_PROJECT, TELEBROWSER_SECRET or ~/.config/telebrowser/secret.`;
 
 const argv = process.argv.slice(2);
 const pi = argv.indexOf("--project");
 if (pi !== -1) {
-  process.env.AGENT_BROWSER_PROJECT = argv[pi + 1];
+  process.env.TELEBROWSER_PROJECT = argv[pi + 1];
   argv.splice(pi, 2);
 }
 const [cmd, ...rest] = argv;
@@ -75,6 +75,6 @@ try {
       process.exit(2);
   }
 } catch (err) {
-  console.error(`agent-browser: ${err.message}`);
+  console.error(`telebrowser: ${err.message}`);
   process.exit(1);
 }

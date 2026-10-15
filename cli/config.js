@@ -19,9 +19,9 @@ function git(cwd, ...args) {
  * repository shares one browser. Outside a repository: `scratch` (wiped when it stops).
  */
 export function resolveProject(cwd = process.cwd(), env = process.env) {
-  if (env.AGENT_BROWSER_PROJECT) {
-    if (!PROJECT_RE.test(env.AGENT_BROWSER_PROJECT)) throw new Error(`invalid AGENT_BROWSER_PROJECT: ${env.AGENT_BROWSER_PROJECT}`);
-    return env.AGENT_BROWSER_PROJECT;
+  if (env.TELEBROWSER_PROJECT) {
+    if (!PROJECT_RE.test(env.TELEBROWSER_PROJECT)) throw new Error(`invalid TELEBROWSER_PROJECT: ${env.TELEBROWSER_PROJECT}`);
+    return env.TELEBROWSER_PROJECT;
   }
   const rel = git(cwd, "rev-parse", "--git-common-dir");
   if (!rel) return "scratch";
@@ -33,18 +33,18 @@ export function resolveProject(cwd = process.cwd(), env = process.env) {
 }
 
 export function readSecret(env = process.env) {
-  if (env.AGENT_BROWSER_SECRET) return env.AGENT_BROWSER_SECRET.trim();
-  const file = env.AGENT_BROWSER_SECRET_FILE || join(env.XDG_CONFIG_HOME || join(homedir(), ".config"), "agent-browser", "secret");
+  if (env.TELEBROWSER_SECRET) return env.TELEBROWSER_SECRET.trim();
+  const file = env.TELEBROWSER_SECRET_FILE || join(env.XDG_CONFIG_HOME || join(homedir(), ".config"), "telebrowser", "secret");
   try {
     return readFileSync(file, "utf8").trim();
   } catch {
-    throw new Error(`no agent-browser secret: set AGENT_BROWSER_SECRET or create ${file}`);
+    throw new Error(`no telebrowser secret: set TELEBROWSER_SECRET or create ${file}`);
   }
 }
 
 export function loadConfig({ cwd = process.cwd(), env = process.env } = {}) {
   const project = resolveProject(cwd, env);
-  const baseUrl = (env.AGENT_BROWSER_URL || "http://127.0.0.1:5858").replace(/\/+$/, "");
+  const baseUrl = (env.TELEBROWSER_URL || "http://127.0.0.1:5858").replace(/\/+$/, "");
   const token = makeToken(readSecret(env), project);
   const wsBase = baseUrl.replace(/^http/, "ws");
   return {
