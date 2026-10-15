@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { PassThrough } from "node:stream";
 import { fileURLToPath } from "node:url";
-import { resolveProject } from "../cli/config.js";
+import { resolveProject, gatewayUrl } from "../cli/config.js";
 import { runMcpProxy } from "../cli/mcp-proxy.js";
 import { listDownloads } from "../cli/tools.js";
 
@@ -74,4 +74,13 @@ test("mcp proxy appends our tools and relays everything else", async () => {
 
   stdin.end();
   assert.equal(await done, 0);
+});
+
+test("gateway url: env, then config file, then default", () => {
+  const cfg = mkdtempSync(join(tmpdir(), "ab-cfg-"));
+  assert.equal(gatewayUrl({ XDG_CONFIG_HOME: cfg }), "http://127.0.0.1:5858");
+  mkdirSync(join(cfg, "telebrowser"));
+  writeFileSync(join(cfg, "telebrowser", "url"), "http://127.0.0.1:5859/\n");
+  assert.equal(gatewayUrl({ XDG_CONFIG_HOME: cfg }), "http://127.0.0.1:5859");
+  assert.equal(gatewayUrl({ XDG_CONFIG_HOME: cfg, TELEBROWSER_URL: "http://x:1" }), "http://x:1");
 });

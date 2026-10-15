@@ -20,7 +20,8 @@ const USAGE = `usage: telebrowser <command> [--project <name>]
   project        print the project name for this directory
 
 The project is the main checkout's directory name (worktrees share it); outside a git
-repository it is "scratch". Environment: TELEBROWSER_URL (default http://127.0.0.1:5858),
+repository it is "scratch". Environment: TELEBROWSER_URL (else ~/.config/telebrowser/url,
+else http://127.0.0.1:5858),
 TELEBROWSER_PROJECT, TELEBROWSER_SECRET or ~/.config/telebrowser/secret.`;
 
 const argv = process.argv.slice(2);

@@ -6,6 +6,8 @@
 # and this loop makes it so: one Chromium per want file, each with its own profile and
 # downloads directory under $DATA/projects/<project>/, restarted if it crashes, stopped
 # gracefully when its file disappears. The `scratch` project is wiped when it stops.
+# A file $DATA/run/raise/<project> asks for that project's window to be brought to the front
+# of the desktop (raise-window.py; Wayland clients cannot raise themselves).
 # It reports running browsers in $DATA/run/up/<project> ("<port> <pid>"), removing an
 # entry only after the process has exited, so the gateway never recycles a port that a
 # previous project's Chromium still holds.
@@ -14,11 +16,12 @@ set -u
 DATA=${TELEBROWSER_DATA:-/data}
 WANT="$DATA/run/want"
 UP="$DATA/run/up"
+RAISE="$DATA/run/raise"
 STATE=/tmp/telebrowser
 HERE=$(dirname "$0")
 PYTHON=${TELEBROWSER_PYTHON:-/lsiopy/bin/python3}
 LOG="$DATA/run/supervisor.log"
-mkdir -p "$WANT" "$UP" "$STATE"
+mkdir -p "$WANT" "$UP" "$RAISE" "$STATE"
 # Nothing survives a container restart, so whatever up/ says is stale.
 rm -f "$UP"/*
 
@@ -120,6 +123,13 @@ while true; do
       rm -f "$UP/$p" # crashed (or never started): not up until restarted
       start "$p" "$port"
     fi
+  done
+  for f in "$RAISE"/*; do
+    [[ -f "$f" ]] || continue
+    p=$(basename "$f")
+    rm -f "$f"
+    [[ "$p" =~ ^[a-z0-9][a-z0-9._-]{0,62}$ ]] && running "$p" || continue
+    timeout 5 "$PYTHON" "$HERE/raise-window.py" "$p" >>"$STATE/$p.log" 2>&1 || log "raise $p failed"
   done
   for f in "$STATE"/*.pid; do
     [[ -f "$f" ]] || continue

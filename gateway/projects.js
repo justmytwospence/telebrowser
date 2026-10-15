@@ -18,6 +18,8 @@ export class Projects {
   constructor({ runDir, portStart = 9300, portEnd = 9399, idleMs = 60 * 60_000, readyTimeoutMs = 45_000, probe, now = Date.now }) {
     this.wantDir = join(runDir, "want");
     this.upDir = join(runDir, "up");
+    this.raiseDir = join(runDir, "raise");
+    mkdirSync(this.raiseDir, { recursive: true });
     mkdirSync(this.wantDir, { recursive: true });
     mkdirSync(this.upDir, { recursive: true });
     this.portStart = portStart;
@@ -102,6 +104,11 @@ export class Projects {
     }
     this.lastActivity.delete(project);
     this.holdUntil.delete(project);
+  }
+
+  /** Ask the supervisor to bring the project's window to the front of the desktop. */
+  raise(project) {
+    writeFileSync(join(this.raiseDir, project), "");
   }
 
   touch(project) {

@@ -34,7 +34,7 @@ export function resolveProject(cwd = process.cwd(), env = process.env) {
 
 export function readSecret(env = process.env) {
   if (env.TELEBROWSER_SECRET) return env.TELEBROWSER_SECRET.trim();
-  const file = env.TELEBROWSER_SECRET_FILE || join(env.XDG_CONFIG_HOME || join(homedir(), ".config"), "telebrowser", "secret");
+  const file = env.TELEBROWSER_SECRET_FILE || join(configDir(env), "secret");
   try {
     return readFileSync(file, "utf8").trim();
   } catch {
@@ -42,9 +42,26 @@ export function readSecret(env = process.env) {
   }
 }
 
+function configDir(env) {
+  return join(env.XDG_CONFIG_HOME || join(homedir(), ".config"), "telebrowser");
+}
+
+/** Gateway URL: TELEBROWSER_URL, else ~/.config/telebrowser/url, else http://127.0.0.1:5858. */
+export function gatewayUrl(env = process.env) {
+  let url = env.TELEBROWSER_URL;
+  if (!url) {
+    try {
+      url = readFileSync(join(configDir(env), "url"), "utf8").trim();
+    } catch {
+      url = "";
+    }
+  }
+  return (url || "http://127.0.0.1:5858").replace(/\/+$/, "");
+}
+
 export function loadConfig({ cwd = process.cwd(), env = process.env } = {}) {
   const project = resolveProject(cwd, env);
-  const baseUrl = (env.TELEBROWSER_URL || "http://127.0.0.1:5858").replace(/\/+$/, "");
+  const baseUrl = gatewayUrl(env);
   const token = makeToken(readSecret(env), project);
   const wsBase = baseUrl.replace(/^http/, "ws");
   return {
@@ -66,6 +83,9 @@ export async function api(cfg, op, { method = "POST", body } = {}) {
     signal: AbortSignal.timeout(60_000),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`gateway ${op}: ${res.status} ${data.error || ""}`.trim());
+  if (!res.ok) {
+    const hint = data.error ? "" : ` (no telebrowser gateway at ${cfg.baseUrl}? set TELEBROWSER_URL or ~/.config/telebrowser/url)`;
+    throw new Error(`gateway ${op}: ${res.status} ${data.error || ""}${hint}`.replace(/ +/g, " ").trim());
+  }
   return data;
 }

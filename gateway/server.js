@@ -151,6 +151,8 @@ export function createGateway({ secret, projects, hostDataDir = "/data", viewUrl
             await send("Target.activateTarget", { targetId: t.targetId });
             return t.targetId;
           });
+          // activateTarget only switches the tab; the window itself is raised by the supervisor.
+          projects.raise(project);
           return json(res, 200, { ...(await describe(project)), focusedTarget: target });
         }
         return json(res, 404, { error: `unknown operation ${op}` });

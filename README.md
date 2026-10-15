@@ -48,7 +48,7 @@ data/
   desktop/                    the container's /config (Selkies and labwc state; no browser profile)
   projects/<p>/profile/       Chromium user data: cookies and logins
   projects/<p>/downloads/     where downloads land (readable on the host)
-  run/want, run/up            gateway/supervisor handshake
+  run/want, run/up, run/raise gateway/supervisor handshake
   run/supervisor.log
 ```
 
@@ -76,7 +76,8 @@ data/
 telebrowser mcp | status | start | stop | focus | hold [min] | downloads | ws | http | project
 ```
 
-Configuration: `TELEBROWSER_URL` (default `http://127.0.0.1:5858`), the secret in
+Configuration: `TELEBROWSER_URL`, else the first line of `~/.config/telebrowser/url`, else
+`http://127.0.0.1:5858`; the secret in
 `TELEBROWSER_SECRET` or `~/.config/telebrowser/secret`. MCP client configuration, for
 any harness:
 
@@ -110,6 +111,13 @@ deployment. The browser container mounts:
 | `browser/s6/svc-telebrowser.user` | `/etc/s6-overlay/s6-rc.d/user/contents.d/svc-telebrowser` |
 | `browser/autostart`, `browser/menu.xml` | `/config/.config/labwc/` (replace the default shared browser) |
 | `browser/policies` | `/etc/chromium/policies/managed` |
+
+Set `SELKIES_MANUAL_WIDTH`/`SELKIES_MANUAL_HEIGHT` (e.g. 1440x900): otherwise every viewer
+resizes the desktop to its own window, so a phone or a tall window reshapes the agents'
+viewport and the maximized project windows under them. Windows share one desktop with no
+taskbar; `telebrowser focus` and `browser_handoff` raise a project's window with
+`browser/raise-window.py` (wlr-foreign-toplevel-management, since Wayland clients cannot
+raise themselves and labwc ignores Chromium's own activation).
 
 Set `S6_SERVICES_GRACETIME=20000` and a `stop_grace_period` of about 30 s. On shutdown the
 supervisor closes every browser with CDP `Browser.close`, which commits cookies to disk; a
