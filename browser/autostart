@@ -1,7 +1,3 @@
 #!/bin/bash
-# labwc autostart (replaces linuxserver's default, which opens one shared Chromium).
-# Project browsers are started on demand by the supervisor; keep it alive.
-while true; do
-  /bin/bash /telebrowser/supervisor.sh
-  sleep 2
-done &
+# labwc autostart. Replaces linuxserver's default, which opens one Chromium with a shared
+# profile. Project browsers are started on demand by the svc-telebrowser s6 service.

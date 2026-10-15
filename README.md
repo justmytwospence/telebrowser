@@ -28,7 +28,7 @@ telebrowser-gateway                    sidecar sharing the browser container's n
         |  run/up/<project>    (supervisor -> gateway)
         v
 telebrowser                            stock lscr.io/linuxserver/chromium (Selkies view on :3000)
-    - browser/supervisor.sh, from labwc's autostart: one Chromium per project with
+    - browser/supervisor.sh, run as the s6 service svc-telebrowser: one Chromium per project with
       --user-data-dir=/data/projects/<p>/profile, debug port on 127.0.0.1 inside the
       container, window titled [<p>], downloads to /data/projects/<p>/downloads
     - browser/policies: no sync or sign-in, no password manager, no download prompt
@@ -101,9 +101,21 @@ The pinned `chrome-devtools-mcp` version is `CHROME_DEVTOOLS_MCP` in `cli/mcp-pr
 ## Deploying
 
 See the homelab stack (`telebrowser/docker-compose.yaml` there) for the reference
-deployment: the browser container mounts `browser/` at `/telebrowser`, `browser/autostart`
-and `browser/menu.xml` into `/config/.config/labwc/`, and `browser/policies` at
-`/etc/chromium/policies/managed`. The gateway image is published as
+deployment. The browser container mounts:
+
+| Repo path | Container path |
+|---|---|
+| `browser/` | `/telebrowser` |
+| `browser/s6/svc-telebrowser` | `/etc/s6-overlay/s6-rc.d/svc-telebrowser` |
+| `browser/s6/svc-telebrowser.user` | `/etc/s6-overlay/s6-rc.d/user/contents.d/svc-telebrowser` |
+| `browser/autostart`, `browser/menu.xml` | `/config/.config/labwc/` (replace the default shared browser) |
+| `browser/policies` | `/etc/chromium/policies/managed` |
+
+Set `S6_SERVICES_GRACETIME=20000` and a `stop_grace_period` of about 30 s. On shutdown the
+supervisor closes every browser with CDP `Browser.close`, which commits cookies to disk; a
+plain SIGTERM, or losing the system D-Bus first, makes Chromium drop the last ~30 s of
+cookie writes, i.e. a fresh sign-in. Create the host data directory as the PUID user
+before the first start, or Docker creates it root-owned. The gateway image is published as
 `ghcr.io/justmytwospence/telebrowser-gateway` by pushing a `vX.Y.Z` tag.
 
 ## Development

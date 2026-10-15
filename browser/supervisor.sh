@@ -1,5 +1,5 @@
 #!/bin/bash
-# Runs inside the linuxserver/chromium container as `abc`, started from labwc's autostart.
+# Runs inside the linuxserver/chromium container as `abc`, as the s6 service svc-telebrowser.
 #
 # The gateway declares which project browsers should run by writing
 #   $DATA/run/want/<project>   (contents: the 127.0.0.1 debug port)
@@ -15,6 +15,8 @@ DATA=${TELEBROWSER_DATA:-/data}
 WANT="$DATA/run/want"
 UP="$DATA/run/up"
 STATE=/tmp/telebrowser
+HERE=$(dirname "$0")
+PYTHON=${TELEBROWSER_PYTHON:-/lsiopy/bin/python3}
 LOG="$DATA/run/supervisor.log"
 mkdir -p "$WANT" "$UP" "$STATE"
 # Nothing survives a container restart, so whatever up/ says is stale.
@@ -76,13 +78,20 @@ start() {
   log "start $p on 127.0.0.1:$port (pid $!)"
 }
 
+wait_exit() {
+  local pid=$1 tries=$2
+  for _ in $(seq 1 "$tries"); do kill -0 "$pid" 2>/dev/null || return 0; sleep 0.2; done
+  return 1
+}
+
 stop() {
-  local p=$1 pid
+  local p=$1 pid port
   pid=$(cat "$STATE/$p.pid" 2>/dev/null || true)
+  port=$(cut -d' ' -f1 "$UP/$p" 2>/dev/null || true)
   if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
-    kill -TERM "$pid" 2>/dev/null
-    for _ in $(seq 1 50); do kill -0 "$pid" 2>/dev/null || break; sleep 0.2; done
-    kill -KILL "$pid" 2>/dev/null || true
+    # Browser.close first: SIGTERM loses cookie writes that are not yet on disk.
+    [[ -n "$port" ]] && timeout 10 "$PYTHON" "$HERE/close-browser.py" "$port" >>"$STATE/$p.log" 2>&1
+    wait_exit "$pid" 50 || { kill -TERM "$pid" 2>/dev/null; wait_exit "$pid" 25; } || kill -KILL "$pid" 2>/dev/null || true
   fi
   rm -f "$STATE/$p.pid" "$STATE/$p.started" "$UP/$p"
   log "stop $p"
@@ -93,7 +102,12 @@ stop() {
 }
 
 log "supervisor up (pid $$)"
-trap 'for f in "$STATE"/*.pid; do [[ -f "$f" ]] && stop "$(basename "$f" .pid)"; done; exit 0' TERM INT
+shutdown() {
+  for f in "$STATE"/*.pid; do [[ -f "$f" ]] && stop "$(basename "$f" .pid)" & done
+  wait
+  exit 0
+}
+trap shutdown TERM INT
 
 while true; do
   for f in "$WANT"/*; do

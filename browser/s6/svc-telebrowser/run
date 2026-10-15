@@ -1,0 +1,17 @@
+#!/usr/bin/with-contenv bash
+# s6 service for the telebrowser supervisor (mounted into the linuxserver image).
+# It runs as a service rather than from labwc's autostart so that on container shutdown
+# s6 stops it, and its Browser.close calls finish, before svc-de tears the desktop down
+# and before svc-dbus goes (Chromium aborts when the system bus disappears):
+# Chromium killed by a plain SIGTERM loses cookie writes not yet committed to disk.
+
+# Project windows go on labwc's own Wayland socket (wayland-0, the compositor the human
+# view routes input to), or on the X display in the image's X11 mode.
+if [[ "${PIXELFLUX_WAYLAND,,}" == "true" ]]; then
+  until [[ -S "${XDG_RUNTIME_DIR}/wayland-0" ]]; do sleep 0.5; done
+  export WAYLAND_DISPLAY=wayland-0
+else
+  until s6-setuidgid abc xset q >/dev/null 2>&1; do sleep 0.5; done
+fi
+export HOME=/config
+exec s6-setuidgid abc /bin/bash /telebrowser/supervisor.sh

@@ -12,4 +12,4 @@ jobs:
         with:
           node-version: 24
       - run: npm test
-      - run: bash -n browser/supervisor.sh browser/autostart
+      - run: bash -n browser/supervisor.sh browser/autostart browser/s6/svc-telebrowser/run
