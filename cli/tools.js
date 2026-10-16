@@ -68,7 +68,7 @@ export async function callTool(cfg, name, args = {}) {
       const where = st.viewUrl ? `Open ${st.viewUrl}` : "Open the telebrowser view";
       return text(
         `Tell the user exactly this, then wait for their reply:\n\n` +
-          `"${where} and use the Chromium window titled ${st.windowTitle} (the project ${st.project}). ` +
+          `"${where} (the window for ${st.project} is now in front). ` +
           `Please ${args.task}. Tell me when you are done."\n\n` +
           `The browser stays up for at least ${minutes} minutes without agent activity. ` +
           `Do not drive the page while the user is working in it.` +

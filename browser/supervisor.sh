@@ -68,7 +68,6 @@ start() {
     --user-data-dir="$dir/profile" \
     --remote-debugging-port="$port" \
     --window-name="[$p]" \
-    --class="telebrowser-$p" \
     --no-first-run \
     --no-default-browser-check \
     --hide-crash-restore-bubble \

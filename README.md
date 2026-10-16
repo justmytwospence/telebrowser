@@ -30,7 +30,7 @@ telebrowser-gateway                    sidecar sharing the browser container's n
 telebrowser                            stock lscr.io/linuxserver/chromium (Selkies view on :3000)
     - browser/supervisor.sh, run as the s6 service svc-telebrowser: one Chromium per project with
       --user-data-dir=/data/projects/<p>/profile, debug port on 127.0.0.1 inside the
-      container, window titled [<p>], downloads to /data/projects/<p>/downloads
+      container, window named [<p>] (used to raise it), downloads to /data/projects/<p>/downloads
     - browser/policies: no sync or sign-in, no password manager, no download prompt
 ```
 
@@ -112,12 +112,13 @@ deployment. The browser container mounts:
 | `browser/autostart`, `browser/menu.xml` | `/config/.config/labwc/` (replace the default shared browser) |
 | `browser/policies` | `/etc/chromium/policies/managed` |
 
-Set `SELKIES_MANUAL_WIDTH`/`SELKIES_MANUAL_HEIGHT` (e.g. 1440x900): otherwise every viewer
-resizes the desktop to its own window, so a phone or a tall window reshapes the agents'
-viewport and the maximized project windows under them. Windows share one desktop with no
-taskbar; `telebrowser focus` and `browser_handoff` raise a project's window with
-`browser/raise-window.py` (wlr-foreign-toplevel-management, since Wayland clients cannot
-raise themselves and labwc ignores Chromium's own activation).
+Without a GPU, set `SELKIES_ENCODER=jpeg,h264enc`: software H.264 can leave the viewer on
+"waiting for stream". Leave the resolution dynamic so the desktop matches the viewer at full
+resolution. Windows share one desktop with no taskbar; `telebrowser focus` and
+`browser_handoff` raise a project's window with `browser/raise-window.py`
+(wlr-foreign-toplevel-management, since Wayland clients cannot raise themselves and labwc
+ignores Chromium's own activation). Chromium keeps its default app_id, so labwc draws no
+titlebar of its own.
 
 Set `S6_SERVICES_GRACETIME=20000` and a `stop_grace_period` of about 30 s. On shutdown the
 supervisor closes every browser with CDP `Browser.close`, which commits cookies to disk; a

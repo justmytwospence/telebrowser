@@ -5,7 +5,7 @@ activation (CDP Target.activateTarget changes the tab, not the stacking). Taskba
 wlr-foreign-toplevel-management protocol for this, so this speaks it directly: a minimal
 Wayland client over the raw wire protocol (the image has no pywayland or wlrctl).
 
-usage: raise-window.py <project>     match app_id telebrowser-<project>, else title [<project>]
+usage: raise-window.py <project>     match the window title [<project>] (Chromium --window-name)
        raise-window.py --list        print app_id and title of every toplevel
 Needs XDG_RUNTIME_DIR and WAYLAND_DISPLAY (labwc's socket).
 """
@@ -110,9 +110,8 @@ def main():
         for t in toplevels.values():
             print(f"{t['app_id']}\t{t['title']}")
         return
-    matches = [h for h, t in toplevels.items() if t["app_id"] == f"telebrowser-{target}"]
-    if not matches:
-        matches = [h for h, t in toplevels.items() if t["title"].startswith(f"[{target}]")]
+    # The app_id stays "chromium": labwc's rules draw no server titlebar for it.
+    matches = [h for h, t in toplevels.items() if t["title"] == f"[{target}]"]
     if not matches:
         sys.exit(f"no window for project {target}")
     for h in matches:
