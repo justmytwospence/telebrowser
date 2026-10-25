@@ -38,7 +38,7 @@ try {
     print(USAGE);
     process.exit(cmd ? 0 : 2);
   }
-  const cfg = loadConfig();
+  const cfg = loadConfig({ session: cmd === "mcp" });
   switch (cmd) {
     case "mcp":
       process.exit(await runMcpProxy(cfg));

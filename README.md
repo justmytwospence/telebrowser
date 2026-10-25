@@ -18,11 +18,13 @@ agent (pi, Claude Code, Codex, opencode)
     - derives the project token from a shared secret
     - runs chrome-devtools-mcp against ws://127.0.0.1:<port>/t/<token>/devtools/browser
     - adds browser_handoff, browser_downloads, browser_info
+    - one session per process: it sees only its own tabs
         |
         v
 telebrowser-gateway                    sidecar sharing the browser container's network
     - the only published port, 127.0.0.1 on the host
     - token -> project; proxies /json/* and /devtools/* to that project's Chromium only
+    - session endpoints relay CDP through a per-agent tab filter
     - starts browsers on demand, stops them after IDLE_MINUTES without CDP traffic
         |  run/want/<project>  (gateway -> supervisor)
         |  run/up/<project>    (supervisor -> gateway)
@@ -40,6 +42,24 @@ The project is the directory name of the main checkout, so every worktree of a r
 shares one browser. A submodule is its own project. Outside a git repository the project is
 `scratch`, which is wiped whenever it stops. `TELEBROWSER_PROJECT` or `--project`
 overrides it.
+
+### Agent sessions
+
+Several agents can work in one project's browser at once without seeing each other.
+Every `telebrowser mcp` process is a session with its own CDP endpoint
+(`/t/<token>/s/<session>/devtools/browser`), relayed through a filter in the gateway
+(`gateway/session.js`):
+
+- a session starts on a blank tab of its own, and sees only the tabs it opened plus the
+  popups those open; other agents' tabs and the human's do not exist for it
+- its new tabs open in the background, so they never take the window from whatever tab the
+  human is looking at; `browser_handoff` selects the agent's own tab and raises the window
+- about 30 s after a session's last connection closes, its tabs are closed (never the
+  window's last tab)
+
+The human can click through every tab freely. The cookies and logins are the project's,
+shared by all its sessions. `telebrowser ws` and `http` in a shell stay unscoped and see
+every tab in the project.
 
 ### Data
 

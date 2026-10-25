@@ -1,6 +1,7 @@
 // Launcher configuration: which project we are in, the gateway URL, and our token.
 
 import { execFileSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
@@ -59,17 +60,23 @@ export function gatewayUrl(env = process.env) {
   return (url || "http://127.0.0.1:5858").replace(/\/+$/, "");
 }
 
-export function loadConfig({ cwd = process.cwd(), env = process.env } = {}) {
+/**
+ * `session: true` (the MCP server) makes this process an agent session: its CDP endpoint
+ * shows only the tabs it opens, and the gateway closes them once it is gone.
+ */
+export function loadConfig({ cwd = process.cwd(), env = process.env, session = false } = {}) {
   const project = resolveProject(cwd, env);
   const baseUrl = gatewayUrl(env);
   const token = makeToken(readSecret(env), project);
   const wsBase = baseUrl.replace(/^http/, "ws");
+  const sessionId = session ? randomBytes(12).toString("base64url") : null;
   return {
     project,
     baseUrl,
     token,
+    session: sessionId,
     /** Browser-level CDP endpoint with the token in the path (no headers needed). */
-    wsEndpoint: `${wsBase}/t/${token}/devtools/browser`,
+    wsEndpoint: `${wsBase}/t/${token}${sessionId ? `/s/${sessionId}` : ""}/devtools/browser`,
     /** HTTP base for /json/* with the token in the path (puppeteer browserURL style). */
     httpEndpoint: `${baseUrl}/t/${token}`,
   };

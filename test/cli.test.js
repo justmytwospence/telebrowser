@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { PassThrough } from "node:stream";
 import { fileURLToPath } from "node:url";
-import { resolveProject, gatewayUrl } from "../cli/config.js";
+import { resolveProject, gatewayUrl, loadConfig } from "../cli/config.js";
 import { runMcpProxy } from "../cli/mcp-proxy.js";
 import { listDownloads } from "../cli/tools.js";
 
@@ -83,4 +83,15 @@ test("gateway url: env, then config file, then default", () => {
   writeFileSync(join(cfg, "telebrowser", "url"), "http://127.0.0.1:5859/\n");
   assert.equal(gatewayUrl({ XDG_CONFIG_HOME: cfg }), "http://127.0.0.1:5859");
   assert.equal(gatewayUrl({ XDG_CONFIG_HOME: cfg, TELEBROWSER_URL: "http://x:1" }), "http://x:1");
+});
+
+test("the MCP server is a session with its own CDP endpoint; other commands are not", () => {
+  const env = { TELEBROWSER_PROJECT: "alpha", TELEBROWSER_SECRET: "x".repeat(40), TELEBROWSER_URL: "http://127.0.0.1:5858" };
+  const plain = loadConfig({ env });
+  assert.equal(plain.session, null);
+  assert.match(plain.wsEndpoint, /^ws:\/\/127\.0\.0\.1:5858\/t\/alpha\.[0-9a-f]+\/devtools\/browser$/);
+  const a = loadConfig({ env, session: true });
+  const b = loadConfig({ env, session: true });
+  assert.notEqual(a.session, b.session);
+  assert.match(a.wsEndpoint, new RegExp(`/t/alpha\\.[0-9a-f]+/s/${a.session}/devtools/browser$`));
 });

@@ -4,6 +4,8 @@
 //   *    /v1/{ensure,stop,status,focus,hold}   project API
 //   *    /json/*                       Chrome's HTTP debug endpoints, for the token's project only
 //   WS   /devtools/*                   CDP, piped to the token's project's Chromium
+//   WS   /s/<session>/devtools/browser CDP for one agent session: it sees only its own tabs
+//                                     (session.js); its tabs close once it is gone
 //
 // Auth is `Authorization: Bearer <token>` or a `/t/<token>` path prefix (for clients that
 // cannot send headers, and in the WebSocket URLs /json returns). A token names exactly one
@@ -13,6 +15,8 @@ import http from "node:http";
 import net from "node:net";
 import { join } from "node:path";
 import { verifyToken } from "../lib/token.js";
+import { SESSION_RE, SessionFilter, SessionState } from "./session.js";
+import { acceptWebSocket } from "./wsframe.js";
 
 const HOP_HEADERS = new Set(["host", "authorization", "origin", "cookie", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto"]);
 
@@ -27,8 +31,14 @@ export function parseAuth(req, secret) {
     const h = req.headers.authorization || "";
     if (h.toLowerCase().startsWith("bearer ")) token = h.slice(7).trim();
   }
+  let session = null;
+  const s = path.match(/^\/s\/([^/?#]+)(\/.*)?$/);
+  if (s && SESSION_RE.test(s[1])) {
+    session = s[1];
+    path = s[2] || "/";
+  }
   const project = token ? verifyToken(secret, token) : null;
-  return { project, token, path };
+  return { project, token, path, session };
 }
 
 export async function probe(port) {
@@ -95,7 +105,45 @@ async function readBody(req) {
   }
 }
 
-export function createGateway({ secret, projects, hostDataDir = "/data", viewUrl = "", log = console.log }) {
+export function createGateway({ secret, projects, hostDataDir = "/data", viewUrl = "", log = console.log, sessionGraceMs = 30_000 }) {
+  const sessions = new Map(); // `${project}/${id}` -> SessionState
+  const sessionOf = (project, id, create = false) => {
+    if (!id || !SESSION_RE.test(id)) return null;
+    const key = `${project}/${id}`;
+    if (!sessions.has(key) && create) sessions.set(key, new SessionState(project, id));
+    return sessions.get(key) ?? null;
+  };
+  const browserWs = async (port) => (await probe(port))?.webSocketDebuggerUrl;
+
+  // Forget pages that no longer exist; give a session without any page a fresh one.
+  const prepareSession = async (state, port) => {
+    await cdp(await browserWs(port), async (send) => {
+      const { targetInfos } = await send("Target.getTargets");
+      const live = new Set(targetInfos.filter((t) => t.type === "page").map((t) => t.targetId));
+      for (const t of [...state.owned]) if (!live.has(t)) state.disown(t);
+      if (!state.owned.size) state.own((await send("Target.createTarget", { url: "about:blank", background: true })).targetId);
+    });
+  };
+
+  // Close a departed session's pages. Closing a window's last tab would quit Chromium, so
+  // when the session owns every page, a blank tab is opened first to keep the window.
+  const endSession = async (state) => {
+    sessions.delete(`${state.project}/${state.id}`);
+    const port = projects.portOf(state.project);
+    if (port === null || !state.owned.size) return;
+    const ws = await browserWs(port);
+    if (!ws) return;
+    await cdp(ws, async (send) => {
+      const { targetInfos } = await send("Target.getTargets");
+      const pages = targetInfos.filter((t) => t.type === "page");
+      const mine = pages.filter((t) => state.owned.has(t.targetId));
+      if (!mine.length) return;
+      if (mine.length === pages.length) await send("Target.createTarget", { url: "about:blank", background: true });
+      for (const t of mine) await send("Target.closeTarget", { targetId: t.targetId }).catch(() => {});
+    });
+    log(`session ended ${state.project}: closed ${state.owned.size} tab(s)`);
+  };
+
   const describe = async (project) => {
     const port = projects.portOf(project);
     const version = port ? await probe(port) : null;
@@ -144,10 +192,17 @@ export function createGateway({ secret, projects, hostDataDir = "/data", viewUrl
         if (op === "focus") {
           const port = await projects.ensure(project);
           const version = await probe(port);
+          const state = sessionOf(project, body.session, true);
+          const wanted = body.targetId || state?.lastTarget;
           const target = await cdp(version.webSocketDebuggerUrl, async (send) => {
             const { targetInfos } = await send("Target.getTargets");
-            let t = targetInfos.find((x) => x.type === "page" && (!body.targetId || x.targetId === body.targetId));
-            if (!t) t = { targetId: (await send("Target.createTarget", { url: "about:blank" })).targetId };
+            let t = targetInfos.find((x) => x.type === "page" && (wanted ? x.targetId === wanted : !state));
+            if (!t && state) t = targetInfos.find((x) => x.type === "page" && state.owned.has(x.targetId));
+            if (!t) {
+              t = { targetId: (await send("Target.createTarget", { url: "about:blank" })).targetId };
+              state?.own(t.targetId);
+            }
+            if (state) state.lastTarget = t.targetId;
             await send("Target.activateTarget", { targetId: t.targetId });
             return t.targetId;
           });
@@ -182,10 +237,14 @@ export function createGateway({ secret, projects, hostDataDir = "/data", viewUrl
     };
     socket.on("error", () => {});
     try {
-      const { project, path } = parseAuth(req, secret);
+      const { project, path, session } = parseAuth(req, secret);
       if (!project) return fail(401, "Unauthorized");
       if (!path.startsWith("/devtools/")) return fail(404, "Not Found");
       const port = await projects.ensure(project);
+      if (session) {
+        if (!/^\/devtools\/browser\/?(\?.*)?$/.test(path)) return fail(404, "Not Found");
+        return await relaySession(req, socket, head, project, session, port);
+      }
       let target = path;
       if (/^\/devtools\/browser\/?(\?.*)?$/.test(path)) {
         const version = await probe(port);
@@ -213,5 +272,68 @@ export function createGateway({ secret, projects, hostDataDir = "/data", viewUrl
     }
   });
 
+  // A session's browser connection: the gateway terminates the client's WebSocket, opens
+  // its own to Chromium, and relays messages through the session's filter.
+  async function relaySession(req, socket, head, project, id, port) {
+    const state = sessionOf(project, id, true);
+    clearTimeout(state.cleanupTimer);
+    state.connections++;
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      if (--state.connections > 0) return;
+      state.cleanupTimer = setTimeout(() => {
+        if (state.connections > 0) return;
+        endSession(state).catch((err) => log(`error ending session: ${err.message}`));
+      }, sessionGraceMs);
+      state.cleanupTimer.unref?.();
+    };
+    try {
+      await prepareSession(state, port);
+      const upstream = new WebSocket(await browserWs(port));
+      await new Promise((res, rej) => {
+        upstream.onopen = res;
+        upstream.onerror = () => rej(new Error("CDP connection failed"));
+      });
+      const filter = new SessionFilter(state);
+      const toBrowser = (m) => upstream.readyState === WebSocket.OPEN && upstream.send(JSON.stringify(m));
+      const client = acceptWebSocket(req, socket, head, {
+        onMessage: (text) => {
+          projects.touch(project);
+          let msg;
+          try {
+            msg = JSON.parse(text);
+          } catch {
+            return;
+          }
+          const r = filter.fromClient(msg);
+          if (r.toClient) client.send(JSON.stringify(r.toClient));
+          if (r.toBrowser) toBrowser(r.toBrowser);
+        },
+        onClose: () => {
+          upstream.close();
+          release();
+        },
+      });
+      if (!client) {
+        upstream.close();
+        return release();
+      }
+      upstream.onmessage = (ev) => {
+        projects.touch(project);
+        const r = filter.fromBrowser(JSON.parse(String(ev.data)));
+        for (const m of r.toBrowser) toBrowser(m);
+        for (const m of r.toClient) client.send(JSON.stringify(m));
+      };
+      upstream.onclose = () => client.close();
+      upstream.onerror = () => client.close();
+    } catch (err) {
+      release();
+      throw err;
+    }
+  }
+
+  server.sessions = sessions;
   return server;
 }

@@ -9,7 +9,7 @@ export const TOOLS = [
     name: "browser_handoff",
     description:
       "Hand the project's browser to the user for a step only a human can do: signing in, a captcha, 2FA or a passkey prompt, a consent screen. " +
-      "Brings this project's window to the front, keeps the browser alive while they work, and returns the exact message to give the user. " +
+      "Brings this project's window to the front with your current tab selected, keeps the browser alive while they work, and returns the exact message to give the user. " +
       "After calling it, tell the user, then stop and wait for them to say they are done before continuing.",
     inputSchema: {
       type: "object",
@@ -64,11 +64,11 @@ export async function callTool(cfg, name, args = {}) {
       const minutes = Math.min(Math.max(Number(args.minutes) || 60, 1), 1440);
       await api(cfg, "ensure");
       await api(cfg, "hold", { body: { minutes } });
-      const st = await api(cfg, "focus");
+      const st = await api(cfg, "focus", { body: { session: cfg.session } });
       const where = st.viewUrl ? `Open ${st.viewUrl}` : "Open the telebrowser view";
       return text(
         `Tell the user exactly this, then wait for their reply:\n\n` +
-          `"${where} (the window for ${st.project} is now in front). ` +
+          `"${where} (the ${st.project} window is in front, on my tab). ` +
           `Please ${args.task}. Tell me when you are done."\n\n` +
           `The browser stays up for at least ${minutes} minutes without agent activity. ` +
           `Do not drive the page while the user is working in it.` +
@@ -89,7 +89,11 @@ export async function callTool(cfg, name, args = {}) {
             cdp: {
               webSocket: cfg.wsEndpoint,
               http: cfg.httpEndpoint,
-              note: "Both carry this project's token; keep them out of committed files and logs. `telebrowser ws` prints the WebSocket URL in a shell.",
+              note:
+                "Both carry this project's token; keep them out of committed files and logs. " +
+                "The WebSocket endpoint is scoped to this session: a script sees only your tabs, and tabs it opens are yours and close when this session ends. " +
+                "`telebrowser ws` in a shell gives the unscoped endpoint (every tab in the project).",
+              session: cfg.session,
             },
           },
           null,
