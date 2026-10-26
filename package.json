@@ -1,6 +1,6 @@
 {
   "name": "telebrowser",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Per-project headful Chromium for coding agents: CDP gateway, MCP launcher, human view.",
   "license": "MIT",
