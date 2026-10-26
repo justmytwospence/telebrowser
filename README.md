@@ -107,6 +107,23 @@ any harness:
 
 The pinned `chrome-devtools-mcp` version is `CHROME_DEVTOOLS_MCP` in `cli/mcp-proxy.js`.
 
+The proxy preserves upstream tools, context and pagination, and adds native MCP context:
+
+- `telebrowser://usage`: local usage, cost and throttling guidance.
+- `telebrowser://status`: token-free project/session configuration, not a live health probe.
+- `telebrowser://downloads{?limit}`: a bounded listing (default 50, maximum 200), costing
+  one gateway status request plus local file metadata reads; never opens file contents.
+- `browser-handoff-review`: a planning prompt that does not execute the proposed task.
+
+Initialization includes these instructions alongside upstream guidance. Our three tools
+have explicit behavioral annotations and runtime-validated inputs; `browser_downloads`
+also returns structured data with an output schema. `browser_handoff` changes browser
+state and is not read-only. `browser_info` still returns secret CDP endpoints for scripts:
+never log/commit them or copy them into resources. There is no known numeric browser/site
+API allowance: respect target-site throttling and Retry-After, avoid repeated polling, and
+inspect ambiguous state-changing outcomes before retrying. Context discovery never starts
+navigation or a handoff.
+
 ## Gateway configuration
 
 | Variable | Default | |
