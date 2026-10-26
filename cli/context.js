@@ -26,7 +26,8 @@ const usage = `${INSTRUCTIONS}\n\n` +
   "The gateway client has a 60-second request timeout. A timeout does not prove an action failed; inspect before retrying. " +
   "Idle browser expiry and a handoff hold are lifecycle limits, not account API quotas. Read status for project/session identity only; it does not assert readiness. " +
   "Prefer bounded snapshots and download listings; do not repeatedly poll a website. Honor site-specific 429/Retry-After responses and wait for the human during a handoff. " +
-  "Resources and prompts never perform a handoff, start navigation, or authorize account changes.";
+  "Context catalog: telebrowser://usage and telebrowser://status are local resources; telebrowser://downloads{?limit} is a URI template (example telebrowser://downloads?limit=20). " +
+  "The browser-handoff-review prompt accepts task. Resources and prompts never perform a handoff, start navigation, or authorize account changes.";
 
 export function ownsResource(uri) {
   return typeof uri === "string" && uri.startsWith("telebrowser:");
