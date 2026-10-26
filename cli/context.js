@@ -7,7 +7,7 @@ export const INSTRUCTIONS =
   "Read telebrowser://usage for costs and limits. browser_info includes secret CDP endpoints: never log or commit them. " +
   "For login, CAPTCHA, 2FA or consent, use browser_handoff, tell the user, then stop driving until they reply. " +
   "Respect target-site throttling and Retry-After; do not loop or retry purchases, submissions or downloads after ambiguous results. " +
-  "Context and prompt discovery never opens pages or starts a browser.";
+  "Telebrowser-owned context/prompt handlers never navigate or start a browser. Connecting the MCP launcher may ensure the project browser.";
 
 export const RESOURCES = [
   { uri: "telebrowser://usage", name: "browser-usage", title: "Browser usage and limits", mimeType: "text/plain", description: "Local guidance; no gateway or website request." },
