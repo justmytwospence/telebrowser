@@ -178,3 +178,9 @@ npm test        # gateway, launcher and MCP proxy unit tests (node:test, no depe
 
 The skill for agents is in `skill/telebrowser/SKILL.md`. It is installed globally from
 the dotfiles, which keep a copy.
+
+## License
+
+[Functional Source License, Version 1.1, ALv2 Future License](LICENSE.md) (FSL-1.1-ALv2). You may use, modify and self-host it for any purpose except offering a competing commercial product or service; each release becomes available under Apache-2.0 two years after it ships. Earlier releases published under MIT remain available under MIT.
+
+Outside contributions require agreeing to a contributor license agreement; open an issue before sending a pull request.
