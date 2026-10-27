@@ -52,8 +52,14 @@ Every `telebrowser mcp` process is a session with its own CDP endpoint
 
 - a session starts on a blank tab of its own, and sees only the tabs it opened plus the
   popups those open; other agents' tabs and the human's do not exist for it
+- that first tab is the window's idle placeholder when there is one (an `about:blank` page
+  no session owns: the tab Chromium starts with, or the one left when a session's tabs
+  close), so what the agent does is what the human sees on opening the view; otherwise it
+  is a new background tab
 - its new tabs open in the background, so they never take the window from whatever tab the
-  human is looking at; `browser_handoff` selects the agent's own tab and raises the window
+  human is looking at; `browser_handoff`, or `select_page` with `bringToFront`
+  (`Page.bringToFront` or `Target.activateTarget` on an own tab), selects the agent's tab
+  and raises the project's window
 - about 30 s after a session's last connection closes, its tabs are closed (never the
   window's last tab)
 

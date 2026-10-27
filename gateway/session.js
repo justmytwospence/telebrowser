@@ -106,8 +106,12 @@ export class SessionFilter {
     } else if (TARGET_ARG_METHODS.has(msg.method)) {
       const t = msg.params?.targetId;
       if (t && this.hiddenTargets.has(t) && !this.state.owned.has(t)) return { toClient: notFound(msg, "No target with given id found") };
+      if (msg.method === "Target.activateTarget" && this.state.owned.has(t)) this.state.lastTarget = t;
     }
-    return { toBrowser: msg };
+    // Bringing one of its own tabs to the front (select_page with bringToFront) switches the
+    // tab, but only the gateway can raise the project's window over the others: ask for it.
+    const raise = msg.method === "Page.bringToFront" || msg.method === "Target.activateTarget";
+    return raise ? { toBrowser: msg, raise } : { toBrowser: msg };
   }
 
   /** A message from the browser. Returns { toClient: [...], toBrowser: [...] }. */

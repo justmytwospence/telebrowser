@@ -6,6 +6,7 @@ export const INSTRUCTIONS =
   "Telebrowser is a project-isolated browser, not an API quota bypass. Use documented APIs when available. " +
   "Read telebrowser://usage for costs and limits. browser_info includes secret CDP endpoints: never log or commit them. " +
   "For login, CAPTCHA, 2FA or consent, use browser_handoff, tell the user, then stop driving until they reply. " +
+  "To show the user a page without a handoff, select_page with bringToFront: true brings your tab and the project's window to the front. " +
   "Respect target-site throttling and Retry-After; do not loop or retry purchases, submissions or downloads after ambiguous results. " +
   "Telebrowser-owned context/prompt handlers never navigate or start a browser. Connecting the MCP launcher may ensure the project browser.";
 

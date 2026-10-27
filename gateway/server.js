@@ -107,28 +107,53 @@ async function readBody(req) {
 
 export function createGateway({ secret, projects, hostDataDir = "/data", viewUrl = "", log = console.log, sessionGraceMs = 30_000 }) {
   const sessions = new Map(); // `${project}/${id}` -> SessionState
+  const ending = new Set(); // SessionStates whose tabs are being closed
   const sessionOf = (project, id, create = false) => {
     if (!id || !SESSION_RE.test(id)) return null;
     const key = `${project}/${id}`;
-    if (!sessions.has(key) && create) sessions.set(key, new SessionState(project, id));
+    // An ending session is replaced, not revived: its tabs are being closed.
+    if ((!sessions.has(key) || ending.has(sessions.get(key))) && create) sessions.set(key, new SessionState(project, id));
     return sessions.get(key) ?? null;
   };
   const browserWs = async (port) => (await probe(port))?.webSocketDebuggerUrl;
 
-  // Forget pages that no longer exist; give a session without any page a fresh one.
+  // Forget pages that no longer exist; give a session without any page one of its own.
+  // That is the window's idle placeholder when there is one: an about:blank page no session
+  // owns (the tab Chromium starts with, or the one left behind when a session's tabs
+  // close). It is usually the tab in front, so the session's work is what the human sees
+  // on opening the view, instead of an empty tab. Otherwise a new tab in the background.
   const prepareSession = async (state, port) => {
     await cdp(await browserWs(port), async (send) => {
       const { targetInfos } = await send("Target.getTargets");
-      const live = new Set(targetInfos.filter((t) => t.type === "page").map((t) => t.targetId));
+      const pages = targetInfos.filter((t) => t.type === "page");
+      const live = new Set(pages.map((t) => t.targetId));
       for (const t of [...state.owned]) if (!live.has(t)) state.disown(t);
-      if (!state.owned.size) state.own((await send("Target.createTarget", { url: "about:blank", background: true })).targetId);
+      if (state.owned.size) return;
+      // Claimed without an await in between, so two sessions cannot both take it.
+      const placeholder = pages.find((t) => t.url === "about:blank" && !t.openerId && !ownerOf(state.project, t.targetId));
+      if (placeholder) state.own(placeholder.targetId);
+      else state.own((await send("Target.createTarget", { url: "about:blank", background: true })).targetId);
     });
+  };
+  const ownerOf = (project, targetId) => {
+    for (const s of [...sessions.values(), ...ending]) if (s.project === project && s.owned.has(targetId)) return s;
+    return null;
   };
 
   // Close a departed session's pages. Closing a window's last tab would quit Chromium, so
   // when the session owns every page, a blank tab is opened first to keep the window.
+  // Until they are gone they still count as owned, so none is adopted as a placeholder.
   const endSession = async (state) => {
-    sessions.delete(`${state.project}/${state.id}`);
+    const key = `${state.project}/${state.id}`;
+    ending.add(state);
+    try {
+      await closeSessionTabs(state);
+    } finally {
+      ending.delete(state);
+      if (sessions.get(key) === state) sessions.delete(key);
+    }
+  };
+  const closeSessionTabs = async (state) => {
     const port = projects.portOf(state.project);
     if (port === null || !state.owned.size) return;
     const ws = await browserWs(port);
@@ -310,6 +335,7 @@ export function createGateway({ secret, projects, hostDataDir = "/data", viewUrl
           const r = filter.fromClient(msg);
           if (r.toClient) client.send(JSON.stringify(r.toClient));
           if (r.toBrowser) toBrowser(r.toBrowser);
+          if (r.raise) projects.raise(project);
         },
         onClose: () => {
           upstream.close();

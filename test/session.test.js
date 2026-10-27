@@ -104,8 +104,8 @@ test("filter: auto-attached foreign pages are resumed and detached by the gatewa
 });
 
 // A fake Chromium speaking just enough browser-level CDP.
-function fakeChrome() {
-  const pages = new Map([["HUMAN", page("HUMAN")]]);
+function fakeChrome(initial = [page("HUMAN", { url: "https://human.example" })]) {
+  const pages = new Map(initial.map((p) => [p.targetId, p]));
   let n = 0;
   const clients = new Set();
   const srv = http.createServer((req, res) => {
@@ -218,6 +218,63 @@ test("gateway: sessions see only their own tabs and clean up after themselves", 
     await new Promise((r) => setTimeout(r, 300));
     assert.deepEqual([...chrome.pages.keys()].sort(), ["HUMAN", pb[0]].sort());
     b.close();
+  } finally {
+    gw.close();
+    chrome.srv.close();
+  }
+});
+
+test("filter: bringing an own tab to the front asks for the window to be raised", () => {
+  const st = new SessionState("p", "sessionA1");
+  st.own("MINE");
+  const f = new SessionFilter(st);
+  f.fromBrowser({ method: "Target.attachedToTarget", params: { sessionId: "S-MINE", targetInfo: page("MINE") } });
+  assert.equal(f.fromClient({ id: 1, method: "Page.bringToFront", sessionId: "S-MINE", params: {} }).raise, true);
+  assert.equal(f.fromClient({ id: 2, method: "Target.activateTarget", params: { targetId: "MINE" } }).raise, true);
+  assert.equal(f.fromClient({ id: 3, method: "Runtime.evaluate", sessionId: "S-MINE", params: {} }).raise, undefined);
+  // Another page's activation is refused, and raises nothing.
+  f.fromBrowser({ method: "Target.targetCreated", params: { targetInfo: page("OTHER") } });
+  const denied = f.fromClient({ id: 4, method: "Target.activateTarget", params: { targetId: "OTHER" } });
+  assert.equal(denied.raise, undefined);
+  assert.equal(denied.toBrowser, undefined);
+});
+
+test("gateway: a session adopts the idle blank tab, and its bringToFront raises the window", async () => {
+  // The window holds the tab Chromium started with (about:blank) and a human's page.
+  const chrome = await fakeChrome([page("START"), page("HUMAN", { url: "https://human.example" })]);
+  const runDir = mkdtempSync(join(tmpdir(), "ab-"));
+  mkdirSync(join(runDir, "up"), { recursive: true });
+  const probe = async () => {
+    for (const p of readdirSync(join(runDir, "want"))) writeFileSync(join(runDir, "up", p), readFileSync(join(runDir, "want", p), "utf8").trim() + " 1");
+    return { Browser: "Chrome/1", webSocketDebuggerUrl: `ws://127.0.0.1:${chrome.port}/devtools/browser/BID` };
+  };
+  const ps = new Projects({ runDir, portStart: chrome.port, portEnd: chrome.port, probe });
+  const gw = createGateway({ secret: SECRET, projects: ps, log: () => {}, sessionGraceMs: 50 });
+  await new Promise((r) => gw.listen(0, "127.0.0.1", r));
+  const tok = makeToken(SECRET, "alpha");
+  const base = `ws://127.0.0.1:${gw.address().port}/t/${tok}`;
+  const pagesOf = async (c) => (await c.send("Target.getTargets")).result.targetInfos.map((t) => t.targetId).sort();
+  try {
+    // The first session takes the start tab; the second, finding none idle, gets a new one.
+    const a = client(`${base}/s/sessionAAAA/devtools/browser`);
+    await a.open;
+    assert.deepEqual(await pagesOf(a), ["START"]);
+    const b = client(`${base}/s/sessionBBBB/devtools/browser`);
+    await b.open;
+    const [pb] = await pagesOf(b);
+    assert.ok(!["START", "HUMAN"].includes(pb));
+    assert.equal(chrome.pages.get(pb).background, true);
+
+    // Activating its own tab raises the project's window.
+    assert.equal(readdirSync(join(runDir, "raise")).length, 0);
+    await a.send("Target.activateTarget", { targetId: "START" });
+    assert.deepEqual(readdirSync(join(runDir, "raise")), ["alpha"]);
+
+    // Adopted or not, a departed session's tabs close.
+    a.close();
+    b.close();
+    await new Promise((r) => setTimeout(r, 300));
+    assert.deepEqual([...chrome.pages.keys()], ["HUMAN"]);
   } finally {
     gw.close();
     chrome.srv.close();
